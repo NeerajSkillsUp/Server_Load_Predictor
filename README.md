@@ -1,26 +1,14 @@
-# Time-Series Forecasting Project
+# API Call Dataset
+![image](https://github.com/psrana/API-Call-Dataset/assets/7460892/ab0f7d99-8911-4dcc-9628-00cc61d40947)
 
-A project to analyze historical time-series data and build predictive models to forecast future trends.
 
-## 🚀 Features
+# Major Project - Time Series
 
-* Analyzes historical data to identify patterns.
-* Trains multiple types of forecasting models.
-* Evaluates models to find the best-performing one.
-* Provides a dashboard to visualize historical data and future predictions.
+### Step1 - Find top 3 most called APIs (Find frequency) | Example - A8, A1, A7, ......
 
-## 🛠️ Tech Stack
 
-* Python
-* Pandas
-* NumPy
-* Scikit-learn
-* Jupyter Notebooks
+### Step2 - Filter the data wrt to APIs and store in different files | Example - A8.csv, A1.csv, A7.csv, ......
 
-## 📈 Project Workflow
+### Step3 - Build multiple models for every file and find the best model | Example - A8-> M3, A1->M7, A7->M3, ...
 
-1.  **Data Ingestion:** Load the raw historical dataset.
-2.  **Data Preprocessing:** Clean, aggregate, and engineer features from the time-series data.
-3.  **Model Training:** Build and train various statistical and machine learning models.
-4.  **Model Evaluation:** Compare models using standard metrics to select the most accurate one.
-5.  **Deployment:** Use the best model for forecasting and visualize results in a dashboard.
+### Step4 - Deploy for all top 3 APIs
