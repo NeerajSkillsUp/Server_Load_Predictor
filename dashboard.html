@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Call Volume Forecast Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for a modern, clean look */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Light gray background */
+        }
+        /* Custom pulse for the loading state */
+        .loading-pulse {
+            animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        /* Ensure select menus are a good size */
+        select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E');
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            background-size: 1.5em 1.5em;
+            padding-right: 2.5rem;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div id="app" class="max-w-3xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-extrabold text-gray-900 mb-2 tracking-tight">
+                API Call Forecast
+            </h1>
+            <p class="text-xl text-gray-600 font-light">
+                Select an API and granularity to get the next prediction.
+            </p>
+        </header>
+
+        <div class="bg-white p-6 rounded-2xl shadow-lg mb-6">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                    <label for="api-select" class="block text-sm font-medium text-gray-700">1. Select API</label>
+                    <select id="api-select" name="api" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md shadow-sm">
+                        <option value="">-- Choose API --</option>
+                        <option value="A2">A2</option>
+                        <option value="A7">A7</option>
+                        <option value="A9">A9</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="granularity-select" class="block text-sm font-medium text-gray-700">2. Select Granularity</label>
+                    <select id="granularity-select" name="granularity" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md shadow-sm">
+                        <option value="">-- Choose Granularity --</option>
+                        <option value="Hourly">Hourly</option>
+                        <option value="Daily">Daily</option>
+                        <option value="Weekly">Weekly</option>
+                    </select>
+                </div>
+
+                <div class="sm:pt-6">
+                    <button id="fetch-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center shadow-md transition-all duration-150 ease-in-out">
+                        <svg id="fetch-icon" class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                        </svg>
+                        <span id="fetch-text">Get Prediction</span>
+                    </button>
+                </div>
+            </div>
+            <span id="last-updated" class="text-sm text-gray-500 mt-4 block text-center"></span>
+        </div>
+        
+        <div id="prediction-card" class="bg-white p-6 rounded-2xl shadow-lg min-h-[250px] flex items-center justify-center">
+            <p class="text-gray-500 text-lg">Please make a selection and press "Get Prediction".</p>
+        </div>
+
+    </div> <script>
+        // Wait for the DOM to be fully loaded before running any script
+        document.addEventListener('DOMContentLoaded', (event) => {
+        
+            // --- Configuration ---
+            // This map *must* match your run_all_apis.py and app_*.py files
+            const API_PORTS = {
+                'A2': {
+                    'Hourly': 5000,
+                    'Daily': 5001,
+                    'Weekly': 5002
+                },
+                'A7': {
+                    'Hourly': 5003,
+                    'Daily': 5004,
+                    'Weekly': 5005
+                },
+                'A9': {
+                    'Hourly': 5006,
+                    'Daily': 5007,
+                    'Weekly': 5008
+                }
+            };
+
+            // --- Get DOM Elements ---
+            const apiSelect = document.getElementById('api-select');
+            const granularitySelect = document.getElementById('granularity-select');
+            const fetchButton = document.getElementById('fetch-button');
+            const fetchIcon = document.getElementById('fetch-icon');
+            const fetchText = document.getElementById('fetch-text');
+            const predictionCard = document.getElementById('prediction-card');
+            const lastUpdatedSpan = document.getElementById('last-updated');
+
+            // --- Helper Functions ---
+
+            function renderLoading() {
+                predictionCard.innerHTML = `
+                    <div class="w-full loading-pulse">
+                        <div class="flex justify-between items-center mb-2">
+                            <div class="h-8 bg-gray-300 rounded-md w-2/5"></div>
+                            <div class="h-6 bg-gray-300 rounded-md w-1/4"></div>
+                        </div>
+                        <div class="h-16 bg-gray-200 rounded-lg w-3/4 mb-4"></div>
+                        <div class="h-4 bg-gray-200 rounded-md w-full mb-2"></div>
+                        <div class="h-4 bg-gray-200 rounded-md w-5/6"></div>
+                    </div>
+                `;
+            }
+            
+            function renderError(api, granularity, port, error) {
+                 predictionCard.innerHTML = `
+                    <div class="w-full text-center">
+                        <span class="bg-red-100 text-red-800 text-lg font-semibold px-4 py-1 rounded-full">OFFLINE</span>
+                        <h2 class="text-3xl font-bold text-gray-900 mt-4">${api} - ${granularity}</h2>
+                        <div class="mt-6 p-4 bg-red-50 rounded-lg">
+                            <p class="text-lg font-bold text-red-700">Connection Error</p>
+                            <p class="text-sm text-red-600">Could not connect to port ${port}.</p>
+                            <p class="text-xs text-gray-500 mt-2">Error: ${error}. Is the service running?</p>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function renderSuccess(data) {
+                const forecastDate = new Date(data.forecast_for_timestamp);
+                const timeFormat = { hour: 'numeric', minute: 'numeric', hour12: true };
+                const dateFormat = { weekday: 'short', month: 'short', day: 'numeric' };
+                
+                let displayTime;
+                let granularity = 'Unknown';
+                if (data.model_type) {
+                    const parts = data.model_type.split('_');
+                    if (parts.length > 1) {
+                        granularity = parts[parts.length - 1]; 
+                        if (granularity.startsWith('Weekly(')) {
+                            granularity = 'Weekly';
+                        }
+                    }
+                }
+                
+                if (granularity === 'Hourly') {
+                    displayTime = `${forecastDate.toLocaleDateString(undefined, dateFormat)}, ${forecastDate.toLocaleTimeString(undefined, timeFormat)}`;
+                } else {
+                    displayTime = forecastDate.toLocaleDateString(undefined, dateFormat);
+                }
+
+                predictionCard.innerHTML = `
+                    <div class="w-full">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <h2 class="text-3xl font-bold text-gray-900">${data.api_code}</h2>
+                                <p class="text-lg font-medium text-blue-600">${granularity} Forecast</p>
+                            </div>
+                            <span class="bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">LIVE</span>
+                        </div>
+                        <p class="text-6xl font-extrabold text-gray-800 my-4">${data.predicted_call_count.toLocaleString()}</p>
+                        <p class="text-sm text-gray-600" title="${data.forecast_for_timestamp}">
+                            <strong>Forecast for:</strong> ${displayTime}
+                        </p>
+                        <p class="text-sm text-gray-500 mt-1" title="Model: ${data.model_type}">
+                            <strong>Model:</strong> ${data.model_type.replace(/_/g, ' ')}
+                        </p>
+                    </div>
+                `;
+            }
+
+            async function handleFetchPrediction() {
+                const api = apiSelect.value;
+                const granularity = granularitySelect.value;
+                
+                if (!api || !granularity) {
+                    predictionCard.innerHTML = '<p class="text-red-600 text-lg">Please select both an API and a granularity.</p>';
+                    return;
+                }
+
+                const port = API_PORTS[api][granularity];
+                const url = `http://127.0.0.1:${port}/predict`;
+
+                fetchButton.disabled = true;
+                fetchIcon.classList.add('animate-spin');
+                fetchText.textContent = 'Fetching...';
+                renderLoading();
+
+                try {
+                    const response = await fetch(url, { signal: AbortSignal.timeout(5000) }); 
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    
+                    renderSuccess(data);
+
+                } catch (error) {
+                    console.error(`Error fetching ${api} (${granularity}) on port ${port}:`, error);
+                    renderError(api, granularity, port, error.message);
+                }
+
+                fetchIcon.classList.remove('animate-spin');
+                fetchText.textContent = 'Get Prediction';
+                fetchButton.disabled = false;
+
+                const now = new Date().toLocaleString('en-US', {
+                    hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true
+                });
+                lastUpdatedSpan.textContent = `Last query: ${now}`;
+            }
+
+            // --- Event Listeners ---
+            if (fetchButton) {
+                fetchButton.addEventListener('click', handleFetchPrediction);
+            } else {
+                console.error("Dashboard Error: Could not find the 'fetch-button'.");
+            }
+
+        }); // --- END of DOMContentLoaded wrapper ---
+    </script>
+
+</body>
+</html>
